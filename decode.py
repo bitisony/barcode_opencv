@@ -8,7 +8,7 @@ import numpy
 import cv2
 import getopt
 
-DEBUG =  False
+DEBUG = False
 
 MIN_WIDTH_NUM = 17
 BAR_VS_SPACE_WIDTH_THRESHOLD = 5
@@ -68,7 +68,8 @@ def barcode_decode (str_bin) :
         if DEBUG :
             print "After inc, idx =", idx
         if idx >= (num_en_width - 2) :
-            print "Last match_arr.append" 
+            if DEBUG :
+                print "Last match_arr.append" 
             match_arr.append([start_idx,num_en_width])
             break
 
@@ -107,4 +108,3 @@ if __name__ == "__main__" :
     if None != result :
         for match in result :
             print match
-

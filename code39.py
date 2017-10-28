@@ -1,8 +1,10 @@
+#!/usr/bin/env python
+import sys
 import os
 import os.path
 import time
 import numpy as np
-import cv2 as cv
+import getopt
 
 # CHECK ASCII   WIDTH           BARCODE         CHECK   ASCII   WIDTH           BARCODE
 # VALUE	CHAR    ENCODING        ENCODING	VALUE	CHAR	ENCODING	ENCODING
@@ -28,7 +30,8 @@ import cv2 as cv
 # 19	J	NNNNWWWNN	101011001101	41	+	NWNNNWNWN	100101001001
 # 20	K	WNNNNNNWW	110101010011	42	%	NNNWNWNWN	101001001001
 # 21	L	NNWNNNNWW	101101010011	n/a	*	NWNNWNWNN	100101101101
-
+DEBUG = False
+MIN_INVERT_CHANGE = 9
 CODE39_SART_CHAR = 43
 CODE39_STOP_CHAR = 43
 CODE39_BIN_WIDTH_MAX = 2
@@ -78,96 +81,190 @@ CODE39_ENCODINGS = [ \
         "100100101001", \
         "100101001001", \
         "101001001001", \
-        "100101101101", \
+        "100101101101" \
         ]
 
-def code39_decode(decode_str) :
-    # decode = "P23507824"
-    print "input :", decode_str
-    decode = ""
-    idx = 0
-    bin_width = 0
-    str_len = len(decode_str)
-    code_s = ""
-    code_cnt = 0
-    code_dir = 1
-    symbols = []
-    symbol_idx = 0
-    symbols_cnt = 0
-    while idx < str_len :
-        # skip "0 , code39 always encode starting with bar"
-        if "" == code_s :
-            if "0" ==  decode_str[idx] :
-                idx = idx + 1
-                continue
+C39_WIDTH_LST = [ \
+        "111221211", \
+        "211211112", \
+        "112211112", \
+        "212211111", \
+        "111221112", \
+        "211221111", \
+        "112221111", \
+        "111211212", \
+        "211211211", \
+        "112211211", \
+        "112211211", \
+        "112112112", \
+        "212112111", \
+        "111122112", \
+        "211122111", \
+        "112122111", \
+        "111112212", \
+        "211112211", \
+        "112112211", \
+        "111122211", \
+        "211111122", \
+        "112111122", \
+        "212111121", \
+        "111121122", \
+        "211121121", \
+        "112121121", \
+        "111111222", \
+        "211111221", \
+        "112111221", \
+        "111121221", \
+        "221111112", \
+        "122111112", \
+        "222111111", \
+        "121121112", \
+        "221121111", \
+        "122121111", \
+        "121111212", \
+        "221111211", \
+        "122111211", \
+        "121212111", \
+        "121211121", \
+        "121112121", \
+        "111212121", \
+        "121121211"\
+        ]
 
-        bin_width = 1
-        # print "bin_width :", bin_width
-        code_s = code_s + decode_str[idx]
-        # print "code_s[", code_cnt, "] =", code_s
-        code_cnt = code_cnt + 1
-        if "1" == decode_str[idx] :
-            while ((idx + 1) < str_len) and ("1" == decode_str[idx + 1]):
-                idx = idx + 1
-                bin_width = bin_width + 1
-                # print "bin_width :", bin_width
-                if bin_width <= CODE39_BIN_WIDTH_MAX :
-                    code_s = code_s + decode_str[idx]
-                    # print "code_s[", code_cnt, "] =", code_s
-                    code_cnt = code_cnt + 1
-                else :
-                    print "bin_width :", bin_width
-
+def c39_format_width(onecode_widths, unit_width):
+    if len(onecode_widths) != MIN_INVERT_CHANGE :
+        if DEBUG :
+            print "Error: widths list length failed!"
+            print onecode_widths
+        return None
+    avg_width = unit_width
+    if (unit_width == 0) :
+        flt_avg_width = (sum(onecode_widths) * 1.0 / CODE39_WIDTH) + 0.25
+        avg_width = int(flt_avg_width)
+    elif unit_width > 0 :
+        avg_width = unit_width
+    else :
+        return None
+    non_aligned_lst = []
+    widths_sum = 0
+    for idx in range(MIN_INVERT_CHANGE) :
+        if onecode_widths[idx] < avg_width :
+            onecode_widths[idx] = avg_width
+        if onecode_widths[idx] / avg_width > CODE39_BIN_WIDTH_MAX :
+            onecode_widths[idx] = CODE39_BIN_WIDTH_MAX * avg_width
+        if onecode_widths[idx] % avg_width != 0 :
+            if (onecode_widths[idx] / avg_width + 1) > CODE39_BIN_WIDTH_MAX :
+                onecode_widths[idx] = CODE39_BIN_WIDTH_MAX * avg_width
+        if onecode_widths[idx] % avg_width != 0 :
+            non_aligned_lst.append(idx)
         else :
-            while  ((idx + 1) < str_len) and ("0" == decode_str[idx + 1]) :
-                idx = idx + 1
-                bin_width = bin_width + 1
-                # print "bin_width :", bin_width
-                if bin_width <= CODE39_BIN_WIDTH_MAX :
-                    code_s = code_s + decode_str[idx]
-                    # print "code_s[", code_cnt, "] =", code_s
-                    code_cnt = code_cnt + 1
-                else :
-                    print "Warning: bin_width =", bin_width
+            widths_sum += onecode_widths[idx]
+    num_non_aligned = len(non_aligned_lst)
+    if num_non_aligned == 0 :
+        return onecode_widths
+    if num_non_aligned == 1:
+        idx = non_aligned_lst[0]
+        onecode_widths[idx] = avg_width * CODE39_WIDTH - widths_sum
+        return onecode_widths
 
-        # forward/reveres
-        if len(code_s) == CODE39_WIDTH : 
-            print "code_s :", code_s
-            if 0 == symbols_cnt :
-                # check if is reverse or not
-                reverse = code_s[::-1]
-                if  code_s == CODE39_ENCODINGS[CODE39_SART_CHAR] :
-                    code_dir = 1
-                elif reverse == CODE39_ENCODINGS[CODE39_STOP_CHAR] :
-                    code_dir = 0
-                else :
-                    code_dir = -1
-            # code39 format error, return empty string
-            if code_dir < 0 :
-                return ""
-            symbols_cnt = symbols_cnt + 1
+    rest_check_sum = 0
+    for var in range(num_non_aligned) :
+        idx = non_aligned_lst[var]
+        flt_multipled = 1.0 * onecode_widths[idx] % avg_width
+        dealed_width = int(100 * flt_multipled + 26) / 100
+        onecode_widths[idx] = dealed_width
+        rest_check_sum += dealed_width
+    if rest_check_sum + widths_sum != avg_width * CODE39_WIDTH:
+        if DEBUG :
+            print onecode_widths
+            print "check_sum failed!"
+        return None
+    return onecode_widths
 
-            tmp_str = code_s
-            if 0 == code_dir :
-                tmp_str = code_s[::-1]
-            symbol_idx = 0
-            for s in CODE39_ENCODINGS :
-                if s == tmp_str :
-                    symbols.append(symbol_idx)
-                symbol_idx = symbol_idx + 1
-            code_s = ""
-            code_cnt = 0
-        idx = idx + 1
-    # end while idx < str_len :
-    decode = "" 
-    if CODE39_SART_CHAR != symbols[0] :
-        return ""
-    if CODE39_STOP_CHAR != symbols[-1] :
-        return ""
-    for sym in symbols :
-        decode = decode + CODE39_CHARACTERS[sym]
-    print "code_dir=  ", code_dir
-    if 0 == code_dir :
-        decode = decode[::-1]
-    return decode
+def c39_start_check(widths_list):
+    start_widths = widths_list[0:9]
+    start_widths = c39_format_width(start_widths, 0)
+    if None == start_widths :
+        return False
+    avg_width = start_widths[0]
+    width_tbl = [ width/avg_width for width in start_widths ]
+    str_width_tbl = [str(width) for width in width_tbl ]
+    str_widths = "".join(str_width_tbl)
+    if DEBUG :
+        print str_widths
+    if str_widths == C39_WIDTH_LST[CODE39_SART_CHAR] :
+        return True,avg_width
+    return False,0
+
+def c39_decode(widths_list) :
+    num_widths = len(widths_list)
+    if num_widths < 29 :
+        return None
+    if 9 != num_widths % 10 :
+        return None
+    chk_start,avg_width = c39_start_check(widths_list)
+    if DEBUG :
+        print "start symbol checked :", chk_start
+    # checked the stop
+    chk_stop,avg_width2 = c39_start_check(widths_list[-9 : ])
+    if DEBUG :
+        print "start symbol checked :", chk_stop
+    if (avg_width == 0) or (avg_width != avg_width2) :
+        return widths_list
+    widths_step = MIN_INVERT_CHANGE + 1
+    num_pure_code = (num_widths - 19) / widths_step
+    str_decode_tbl = []
+    for cnt in range(num_pure_code) :
+        start = 10 + cnt * widths_step
+        end = start + widths_step
+        cur_code_widths = widths_list[start : end]
+        if DEBUG :
+            print cur_code_widths
+        formated_widths = c39_format_width(cur_code_widths[0 : 9], avg_width)
+        if None == formated_widths :
+            return None
+        width_tbl = [ width / avg_width for width in formated_widths ]
+        str_width_tbl = [str(width) for width in width_tbl ]
+        str_widths = "".join(str_width_tbl)
+        str_decode_tbl.append(str_widths)
+        if DEBUG :
+            print str_widths
+    num_c39_code = len(C39_WIDTH_LST)
+    decode_res = ""
+    for str_decode in str_decode_tbl :
+        for idx in range(num_c39_code) :
+            if str_decode == C39_WIDTH_LST[idx] :
+                decode_res += CODE39_CHARACTERS[idx]
+    return decode_res
+
+if __name__ == "__main__" :
+    import decode
+    # print sys.argv
+    if len(sys.argv) < 2 :
+        sys.exit(-1)
+    opts,args = getopt.getopt(sys.argv[1:], "hd", ["help"])
+    # print opts,args
+    for opt,arg in opts :
+        # print "opt:",opt
+        if opt in ('-h', "--help") :
+            print "Help pring"
+        elif opt == "-d" :
+            DEBUG = True
+            decode.DEBUG = True
+            print "DEBUG =", DEBUG
+        else :
+            pass
+
+    if args == [] :
+        print "Error: No argument"
+        sys.exit(-1)
+    if DEBUG :
+        print args[0]
+    result = decode.barcode_decode(args[0])
+    if None == result :
+        sys.exit(-1)
+    for widths in result :
+        str_decode = c39_decode(widths)
+        if None != str_decode :
+            print "Decoded:", str_decode
 
