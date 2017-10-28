@@ -88,7 +88,7 @@ if [] != str_bin_arr :
         rows.append(cols)
 
 gray_img = np.array(rows, dtype=np.uint8)
-print gray_img
+# print gray_img
 cv2.imwrite(output_file, gray_img)
 # cv2.imshow(output_file,gray_img)
 # key = cv2.waitKeyEx(-1) & 0xff
