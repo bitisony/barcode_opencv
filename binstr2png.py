@@ -14,7 +14,9 @@ opts,args = getopt.getopt(sys.argv[1:], "hdwi:o:", ["help", "output", "input"])
 # print opts,args
 str_bin_arr = []
 input_file = ""
-output_file = "strbin2img.png"
+def_output = time.strftime("%Y%m%d%H%M%S", time.localtime())
+output_file = "img" + def_output + ".png"
+print "output:", output_file
 is_width_arr = False
 
 for opt,arg in opts :
@@ -55,12 +57,11 @@ if "" == input_file :
         for i in range(len(str_width)) :
             # print "i=", i, str_width[i]
             width = int(str_width[i])
-            if 0 == width :
-                width = 2
-            line += "".center(width, space_bar_tbl[i%2]);   
+            if 0 != width :
+                line += "".center(width, space_bar_tbl[i%2])
     else :
         line = args[0]
-    pad_space = "".center(5,"0")
+    pad_space = "".center(4,"0")
     line = pad_space + line + pad_space
     height = DEF_IMG_HEIGHT
     for row in range(height) :
@@ -87,5 +88,8 @@ if [] != str_bin_arr :
         rows.append(cols)
 
 gray_img = np.array(rows, dtype=np.uint8)
+print gray_img
 cv2.imwrite(output_file, gray_img)
-
+# cv2.imshow(output_file,gray_img)
+# key = cv2.waitKeyEx(-1) & 0xff
+# cv2.destroyAllWindows()
