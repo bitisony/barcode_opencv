@@ -23,14 +23,14 @@ if __name__ == "__main__" :
     image = cv2.imread(img_file, cv2.IMREAD_UNCHANGED)
     height =  image.shape[0]
     width  =  image.shape[1]
-    print "height =",height, " width =", width, len(image.shape)
-    if len(image.shape) >= 3 :
+    # print "height =",height, " width =", width, len(image.shape)
+    gray = image
+    if len(image.shape) == 3 :
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    else :
-        gray = image
 
     thn = DECODE_EAN_THRESHOLD_START
     while thn <= DECODE_EAN_THRESHOLD_END :
+        # print "threshold = %d" % thn
         ret,th_img = cv2.threshold(gray,thn,255,cv2.THRESH_BINARY)
         thn = thn + DECODE_EAN_THRESHOLD_STEP
     
@@ -59,23 +59,25 @@ if __name__ == "__main__" :
         for tmp_row in rows :
             # print tmp_row
             # ean.DEBUG = True
-            res = ean.ean_decode(tmp_row)
-            if None != res :
-                if len(res) > 0 :
-                    find = True
-                    print "Decoded:", res
-                    break
-            else :
-                result = decode.barcode_decode(tmp_row)
-                if None == result :
-                    continue
-                for widths in result :
+            result = decode.barcode_decode(tmp_row)
+            if None == result :
+                continue
+            for widths in result :
+                num_widths = len(widths)
+                if num_widths in ean.EAN_ENCODES_INVERT_TBL :
+                    str_bin = ["1", "0"]
+                    str_encodings = ""
+                    for idx in range(len(widths)) :
+                        str_encodings += "".center(widths[idx], str_bin[idx%2])
+                    res = ean.ean_decode(str_encodings)
+                    if None != res :
+                        print "Decoded:", res
+                        sys.exit(0)
+                elif (num_widths % 10) == 9 :
                     str_decode = code39.c39_decode(widths)
                     if None != str_decode :
                         print "Code39 Decoded:", str_decode
-                        find = True
-                        break
-                if find :
-                    break
-        if find :
-            break
+                        sys.exit(0)
+                else :
+                    # other symbol types not be supported yet
+                    pass
