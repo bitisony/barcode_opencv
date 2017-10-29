@@ -185,7 +185,7 @@ def c39_start_check(widths_list):
     start_widths = widths_list[0:9]
     start_widths = c39_format_width(start_widths, 0)
     if None == start_widths :
-        return False
+        return False,0
     avg_width = start_widths[0]
     width_tbl = [ width/avg_width for width in start_widths ]
     str_width_tbl = [str(width) for width in width_tbl ]
@@ -210,7 +210,7 @@ def c39_decode(widths_list) :
     if DEBUG :
         print "start symbol checked :", chk_stop
     if (avg_width == 0) or (avg_width != avg_width2) :
-        return widths_list
+        return None
     widths_step = MIN_INVERT_CHANGE + 1
     num_pure_code = (num_widths - 19) / widths_step
     str_decode_tbl = []

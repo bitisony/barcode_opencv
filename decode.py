@@ -54,13 +54,15 @@ def barcode_decode (str_bin) :
                     end_idx = idx + 1
                     match_arr.append([start_idx,end_idx])
                 ratio_cnt = 0
-                print "pre start_idx =", start_idx
+                if DEBUG :
+                    print "pre start_idx =", start_idx
                 start_idx = idx + 2
                 if encode_width_arr[idx] > encode_width_arr[idx + 1] :
                     start_idx = idx + 1
                 if 0 != start_idx % 2 :
                     start_idx += 1
-                print "next start_idx =", start_idx
+                if DEBUG :
+                    print "next start_idx =", start_idx
                 break
             else :
                 ratio_cnt += 1

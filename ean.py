@@ -244,7 +244,7 @@ def ean_decode(str_bin) :
         if DEBUG :
             print "Error: Invalid encode length!"
         return None
-    print "digit arr:", str_ean13_decode, ", length:",len(str_ean13_decode)
+    # print "digit arr:", str_ean13_decode, ", length:",len(str_ean13_decode)
     check_sum = 0
     for i in range(len(dig_arr_ean13_decode) - 1) :
         if 0 == (i%2) :

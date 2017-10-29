@@ -7,11 +7,12 @@ import numpy
 import cv2
 import argparse
 import decode
+import code39
 import ean
 
 if __name__ == "__main__" :
-    DECODE_EAN_THRESHOLD_START = 120
-    DECODE_EAN_THRESHOLD_END = 130
+    DECODE_EAN_THRESHOLD_START = 100
+    DECODE_EAN_THRESHOLD_END = 200
     DECODE_EAN_THRESHOLD_STEP = 5
     ap = argparse.ArgumentParser()
     ap.add_argument("-i","--image", required = True, help = "Path to image file")
@@ -58,11 +59,22 @@ if __name__ == "__main__" :
         for tmp_row in rows :
             # print tmp_row
             res = ean.ean_decode(tmp_row)
-            if None == res :
-                continue
-            if len(res) > 0 :
-                print res
-                find = True
-                break
+            if None != res :
+                if len(res) > 0 :
+                    find = True
+                    print "Decoded:", res
+                    break
+            else :
+                result = decode.barcode_decode(tmp_row)
+                if None == result :
+                    continue
+                for widths in result :
+                    str_decode = code39.c39_decode(widths)
+                    if None != str_decode :
+                        print "Code39 Decoded:", str_decode
+                        find = True
+                        break
+                if find :
+                    break
         if find :
             break
