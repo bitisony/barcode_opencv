@@ -11,7 +11,7 @@ import getopt
 DEBUG = False
 
 MIN_WIDTH_NUM = 17
-BAR_VS_SPACE_WIDTH_THRESHOLD = 5
+BAR_VS_SPACE_WIDTH_THRESHOLD = 7
 
 def barcode_decode (str_bin) :
     if None == str_bin :

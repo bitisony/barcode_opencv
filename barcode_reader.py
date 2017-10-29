@@ -63,21 +63,11 @@ if __name__ == "__main__" :
             if None == result :
                 continue
             for widths in result :
-                num_widths = len(widths)
-                if num_widths in ean.EAN_ENCODES_INVERT_TBL :
-                    str_bin = ["1", "0"]
-                    str_encodings = ""
-                    for idx in range(len(widths)) :
-                        str_encodings += "".center(widths[idx], str_bin[idx%2])
-                    res = ean.ean_decode(str_encodings)
-                    if None != res :
-                        print "Decoded:", res
-                        sys.exit(0)
-                elif (num_widths % 10) == 9 :
-                    str_decode = code39.c39_decode(widths)
-                    if None != str_decode :
-                        print "Code39 Decoded:", str_decode
-                        sys.exit(0)
-                else :
-                    # other symbol types not be supported yet
-                    pass
+                str_decode = ean.ean_decode(widths)
+                if None != str_decode :
+                    print "Decoded:", str_decode
+                    sys.exit(0)
+                str_decode = code39.c39_decode(widths)
+                if None != str_decode :
+                    print "Code39 Decoded:", str_decode
+                    sys.exit(0)

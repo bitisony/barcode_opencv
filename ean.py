@@ -79,38 +79,10 @@ EAN13_DECODE_TBL = [ \
 ["0001011", "0010111", "1110100"], \
 ]
 
-def ean_decode(str_bin) :
+def ean_decode(widths) :
 # step 1. find left guard
-    if DEBUG :
-        print "input:", str_bin
-    str_encode = str_bin.strip("0")
-    encode_len = len(str_encode)
-    min_len = 6 * CODE_LEN + 9
-    if encode_len < min_len :
-        if DEBUG :
-            print "Error: Invalid encoding length!"
-        return None
-    encode_width_arr = []
-    end_idx = 0
-    start_idx = 0
-    width_idx = 0 
-    bin_arr = ["1", "0"]
-    while end_idx < encode_len :
-        end_idx = str_encode.find(bin_arr[(width_idx + 1)% 2], start_idx)
-        if end_idx < 0 :
-            end_idx = encode_len
-            width = end_idx - start_idx
-            encode_width_arr.append(width)
-            break
-        width = end_idx - start_idx
-        encode_width_arr.append(width)
-        width_idx += 1
-        start_idx = end_idx
+    encode_width_arr = widths
     num_en_width = len(encode_width_arr)
-    ean_normal_len = 12 * MIN_INVERT_CHANGE + 11
-    upc_short_len = (UPC_E_SYMBOL_NUM  * MIN_INVERT_CHANGE) + 9
-    if DEBUG :
-        print "origin:", encode_width_arr, "num_width_arr:", num_en_width
     found = False
     for valid_len in EAN_ENCODES_INVERT_TBL :
         if num_en_width == valid_len :
@@ -122,6 +94,14 @@ def ean_decode(str_bin) :
         if DEBUG :
             print "encode_length:", num_en_width
         return None
+    end_idx = 0
+    start_idx = 0
+    width_idx = 0 
+    bin_arr = ["1", "0"]
+    ean_normal_len = 12 * MIN_INVERT_CHANGE + 11
+    upc_short_len = (UPC_E_SYMBOL_NUM  * MIN_INVERT_CHANGE) + 9
+    if DEBUG :
+        print "origin:", encode_width_arr, "num_width_arr:", num_en_width
     # left guard check
     left_guard_sum = 0
     for idx in range(3) :
@@ -316,6 +296,7 @@ if __name__ == "__main__" :
             print "Help pring"
         elif opt == "-d" :
             DEBUG = True
+            decode.DEBUG = True
             print "DEBUG =", DEBUG
         else :
             pass
@@ -325,7 +306,9 @@ if __name__ == "__main__" :
         sys.exit(-1)
     if DEBUG :
         print args[0]
-    result = ean_decode(args[0])
-    if None != result :
-        print result
+    widths_tbl = decode.barcode_decode(args[0])
+    if None != widths_tbl :
+        result = ean_decode(widths_tbl[0])
+        if None != result :
+            print result
 
