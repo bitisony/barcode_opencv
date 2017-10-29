@@ -244,7 +244,8 @@ def ean_decode(str_bin) :
         if DEBUG :
             print "Error: Invalid encode length!"
         return None
-    # print "digit arr:", str_ean13_decode, ", length:",len(str_ean13_decode)
+    if DEBUG :
+        print "digit arr:", str_ean13_decode, ", length:",len(str_ean13_decode)
     check_sum = 0
     for i in range(len(dig_arr_ean13_decode) - 1) :
         if 0 == (i%2) :
@@ -259,12 +260,19 @@ def ean_decode(str_bin) :
             str_ean13_decode = "0" + str_ean13_decode
             pass
         else :
-            check_sum += 7
-            tmp_check_digit = 10 - (check_sum % 10)
-            if tmp_check_digit != check_digit :
+            checksum_match = False
+            for first_no in range(10) :
+                ean13_checksum = check_sum
+                ean13_checksum += first_no
+                tmp_check_digit = 10 - (ean13_checksum % 10)
+                if tmp_check_digit != check_digit :
+                    continue
+                # this is EAN13 standard symbols
+                str_ean13_decode = str(first_no) + str_ean13_decode
+                checksum_match = True
+                break
+            if checksum_match == False :
                 return None
-            # this is EAN13 standard symbols
-            str_ean13_decode = "7" + str_ean13_decode
     elif len(dig_arr_ean13_decode) == EAN8_SYMBOL_NUM :
         check_digit = dig_arr_ean13_decode[-1]
         tmp_check_digit = 10 - (check_sum % 10)

@@ -58,6 +58,7 @@ if __name__ == "__main__" :
         find = False
         for tmp_row in rows :
             # print tmp_row
+            # ean.DEBUG = True
             res = ean.ean_decode(tmp_row)
             if None != res :
                 if len(res) > 0 :
