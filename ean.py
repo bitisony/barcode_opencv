@@ -79,6 +79,74 @@ EAN13_DECODE_TBL = [ \
 ["0001011", "0010111", "1110100"], \
 ]
 
+def ean_avg_width_get(widths, num_en_width):
+    guard_widths = widths[0:3]
+    if num_en_width == EAN_ENCODES_INVERT_TBL[2]: 
+        guard_widths += widths[-6:]
+        guard_widths += widths[(num_en_width - 11)/2 : (num_en_width - 11)/2 + 5]
+    else :
+        guard_widths += widths[-3:]
+
+    unique_sets = set(sorted(guard_widths))
+    unique_widths =  [ w for w in unique_sets ]
+    if DEBUG :
+        print "guard origin:", widths, " sorted:", unique_widths
+    if len(unique_widths) == 1:
+        avg_width = unique_widths[0]
+    else :
+        times_aligned = []
+        for ref_w in (unique_widths) :
+            idx = 0
+            just_times_cnt = 0
+            for idx in range(num_en_width) :
+                if widths[idx] % ref_w == 0 :
+                    just_times_cnt += 1
+            times_aligned.append(just_times_cnt)
+        max_cnt = times_aligned[-1]
+        dst_idx = len(times_aligned) - 1
+        for idx in range(len(unique_widths) - 1) :
+            if times_aligned[idx] > max_cnt :
+                max_cnt = times_aligned[idx]
+                dst_idx = idx
+        avg_width = unique_widths[dst_idx]
+
+    return avg_width
+
+def eancode_widths_adjust(widths, avg_width, left_or_right = True) :
+    non_aligned = []
+    for idx in range(MIN_INVERT_CHANGE) :
+        if widths[idx] % avg_width != 0 :
+            non_aligned.append(idx)
+    num_non_aligned = len(non_aligned)
+    if 0 == num_non_aligned :
+        return widths
+    elif 1 == num_non_aligned :
+        widths_sum = 0
+        for idx in range(MIN_INVERT_CHANGE) :
+            if idx != non_aligned[0] :
+                widths_sum += widths[idx]
+
+        if (widths_sum / avg_width) >= CODE_LEN:
+            return None
+        else :
+            rest_width = avg_width * CODE_LEN - widths_sum
+            adj_idx = non_aligned[0]
+            widths[adj_idx] = rest_width
+            return widths
+    else :
+        for w in non_aligned :
+            mod_width = widths[w] % avg_width
+            if (mod_width * 100 / avg_width) >= 50 :
+                widths[w] = (widths[w] / avg_width + 1) * avg_width
+            else :
+                widths[w] = (widths[w] / avg_width) * avg_width
+        widths_sum = 0
+        for idx in range(MIN_INVERT_CHANGE) :
+            widths_sum += widths[idx]
+        if widths_sum == (avg_width * CODE_LEN) :
+            return widths
+    return None
+
 def ean_decode(widths) :
 # step 1. find left guard
     encode_width_arr = widths
@@ -88,11 +156,11 @@ def ean_decode(widths) :
         if num_en_width == valid_len :
             found = True
             if DEBUG :
-                print "valid_len =", num_en_width
+                print "valid_len = %d" % num_en_width
             break
     if found == False :
         if DEBUG :
-            print "encode_length:", num_en_width
+            print "encode_length: %d" % num_en_width
         return None
     end_idx = 0
     start_idx = 0
@@ -103,12 +171,21 @@ def ean_decode(widths) :
     if DEBUG :
         print "origin:", encode_width_arr, "num_width_arr:", num_en_width
     # left guard check
-    left_guard_sum = 0
-    for idx in range(3) :
-        left_guard_sum += encode_width_arr[idx]
-    avg_width = left_guard_sum / 3
+    avg_width = ean_avg_width_get(encode_width_arr, num_en_width)
+    if None == avg_width :
+        return None
     if DEBUG :
         print "avg_width:",avg_width
+
+    # adjust wdith to align avg_width
+    for idx in range(num_en_width) :
+        if encode_width_arr[idx] < avg_width :
+            encode_width_arr[idx] = avg_width
+        if encode_width_arr[idx] / avg_width > CELL_REPEAT_MAX :
+            encode_width_arr[idx] = avg_width = CELL_REPEAT_MAX * avg_width
+
+    if DEBUG :
+        print "After adjust widths: ", encode_width_arr
     tmp_left_guard = ""
     for idx in range(3) :
         width = encode_width_arr[idx] / avg_width
@@ -149,45 +226,25 @@ def ean_decode(widths) :
     pure_encode_len = len(dst_en_arr)
     if DEBUG :
         print dst_en_arr, pure_encode_len
-    # adjust wdith to align avg_width
-    for idx in range(pure_encode_len) :
-        if dst_en_arr[idx] < avg_width :
-            dst_en_arr[idx] = avg_width
-    for idx in range(pure_encode_len) :
-        if (dst_en_arr[idx] % avg_width) != 0 :
-            offset = idx % MIN_INVERT_CHANGE
-            base = (idx / MIN_INVERT_CHANGE) * MIN_INVERT_CHANGE
-            sym_sum = 0
-            for ii in range(MIN_INVERT_CHANGE) :
-                if offset != ii :
-                    sym_sum += dst_en_arr[base + ii]
-            code_len = sym_sum / avg_width
-            part_len = CODE_LEN - code_len
-            rest_len = dst_en_arr[idx] / avg_width
-            if DEBUG :
-                print "code_len:",code_len, "part_len:",part_len, "rest_len:", rest_len
-            # check if add or insert width
-            if (rest_len + code_len) == CODE_LEN :
-                dst_en_arr[idx] = avg_width * rest_len
-            else :
-                dst_en_arr[idx] = avg_width * (rest_len + 1)
-                rest_len = dst_en_arr[idx] / avg_width
-                if DEBUG :
-                    print "code_len:",code_len, "rest_len:", rest_len
-                if (rest_len + code_len) != CODE_LEN :
-                    if DEBUG :
-                        print "Error: encode length!"
-                    return None
-
-    if DEBUG :
-        print "pure encoding:", dst_en_arr, pure_encode_len
+    dst_adj_widths = []
+    for idx in range(pure_encode_len/MIN_INVERT_CHANGE) :
+        adj_widths = eancode_widths_adjust(\
+                dst_en_arr[MIN_INVERT_CHANGE * idx : MIN_INVERT_CHANGE * (idx + 1)],\
+                avg_width, True)
+        if None != adj_widths :
+            for width in adj_widths :
+                dst_adj_widths.append(width)
+        else :
+            return None
+    if (len(dst_adj_widths) != pure_encode_len) :
+        return None
     str_encode = ""
     str_encode_arr = []
     for idx in range(pure_encode_len) :
-        if idx < (UPC_E_SYMBOL_NUM * MIN_INVERT_CHANGE) :
-            str_encode += "".center(dst_en_arr[idx]/avg_width, bin_arr[(idx + 1)%2])
+        if idx < ena_half_len :
+            str_encode += "".center(dst_adj_widths[idx]/avg_width, bin_arr[(idx + 1)%2])
         else :
-            str_encode += "".center(dst_en_arr[idx]/avg_width, bin_arr[(idx)%2])
+            str_encode += "".center(dst_adj_widths[idx]/avg_width, bin_arr[(idx)%2])
         if 0 == ((idx+1) % MIN_INVERT_CHANGE) :
             str_encode_arr.append(str_encode)
             if DEBUG :
@@ -255,7 +312,9 @@ def ean_decode(widths) :
                 return None
     elif len(dig_arr_ean13_decode) == EAN8_SYMBOL_NUM :
         check_digit = dig_arr_ean13_decode[-1]
-        tmp_check_digit = 10 - (check_sum % 10)
+        tmp_check_digit = check_sum % 10
+        if 0 != tmp_check_digit :
+            tmp_check_digit = 10 - tmp_check_digit
         if tmp_check_digit != check_digit :
             return None
     elif len(dig_arr_ean13_decode) == UPC_E_SYMBOL_NUM :
